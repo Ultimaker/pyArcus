@@ -7,14 +7,9 @@
 #include "Arcus/Types.h"
 #include <Python.h>
 
-namespace google
-{
-namespace protobuf
-{
-class Descriptor;
-class Reflection;
-} // namespace protobuf
-} // namespace google
+#include <google/protobuf/descriptor.h>
+#include <google/protobuf/message.h>
+#include <google/protobuf/reflection.h>
 
 namespace Arcus
 {

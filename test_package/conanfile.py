@@ -32,5 +32,6 @@ class ArcusTestConan(ConanFile):
             test_buf = StringIO()
             self.run(f"python test.py", env = "conanrun", output = test_buf)
             ret_val = test_buf.getvalue()
+            print(ret_val)
             if "True" not in ret_val:
                 raise ConanException("pyArcus wasn't build correctly!")
