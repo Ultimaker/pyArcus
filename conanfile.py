@@ -10,7 +10,7 @@ from conan.tools.files import copy, update_conandata
 from conan.tools.microsoft import check_min_vs, is_msvc, is_msvc_static_runtime
 from conan.tools.scm import Version, Git
 
-required_conan_version = ">=1.58.0"
+required_conan_version = ">=1.64.0"
 
 
 class ArcusConan(ConanFile):
@@ -73,7 +73,7 @@ class ArcusConan(ConanFile):
         for req in self.conan_data["requirements"]:
             self.requires(req)
         self.requires("protobuf/3.21.9", transitive_headers=True)
-        self.requires("cpython/3.10.4")  # Maybe place this in build_requirements as well
+        self.requires("cpython/3.12.2")  # Maybe place this in build_requirements as well
         self.requires("zlib/1.2.12")
 
     def validate(self):
