@@ -72,7 +72,7 @@ class ArcusConan(ConanFile):
     def requirements(self):
         for req in self.conan_data["requirements"]:
             self.requires(req)
-        self.requires("cpython/3.12.2")
+        self.requires("cpython/3.12.7")
 
     def validate(self):
         if self.settings.compiler.cppstd:
@@ -120,7 +120,9 @@ class ArcusConan(ConanFile):
 
         # Generate the Source code from SIP
         sip = self.python_requires["sipbuildtool"].module.SipBuildTool(self)
-        sip.configure()
+        # Use the full path to sip-build from the CPython Scripts directory
+        sip_build_path = os.path.join(self.dependencies["cpython"].cpp_info.bindirs[0], "Scripts", "sip-build.exe")
+        sip.configure(sip_install_executable=sip_build_path)
         sip.build()
 
     def layout(self):
