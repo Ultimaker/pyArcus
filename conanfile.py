@@ -120,9 +120,8 @@ class ArcusConan(ConanFile):
 
         # Generate the Source code from SIP
         sip = self.python_requires["sipbuildtool"].module.SipBuildTool(self)
-        # Use the full path to sip-build from the CPython Scripts directory
-        sip_build_path = os.path.join(self.dependencies["cpython"].cpp_info.bindirs[0], "Scripts", "sip-build.exe")
-        sip.configure(sip_install_executable=sip_build_path)
+        # Auto-detect sip-build from CPython dependency (cross-platform)
+        sip.configure(cpython_dependency=self.dependencies["cpython"])
         sip.build()
 
     def layout(self):
