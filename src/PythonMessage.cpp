@@ -32,7 +32,7 @@ PythonMessage::~PythonMessage()
 
 std::string Arcus::PythonMessage::getTypeName() const
 {
-    return _message->GetTypeName();
+    return std::string(_message->GetTypeName());
 }
 
 MessagePtr Arcus::PythonMessage::getSharedMessage() const
