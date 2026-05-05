@@ -32,7 +32,7 @@ PythonMessage::~PythonMessage()
 
 std::string Arcus::PythonMessage::getTypeName() const
 {
-    return _message->GetTypeName();
+    return std::string(_message->GetTypeName());
 }
 
 MessagePtr Arcus::PythonMessage::getSharedMessage() const
@@ -40,15 +40,29 @@ MessagePtr Arcus::PythonMessage::getSharedMessage() const
     return _shared_message;
 }
 
+// Instead of `_descriptor->FindFieldByName(field_name)`.
+const google::protobuf::FieldDescriptor* findFieldByNameHack(const google::protobuf::Descriptor* _descriptor, const std::string_view field_name)
+{
+    for (int ii = 0; ii < _descriptor->field_count(); ++ii)
+    {
+        auto candidate = _descriptor->field(ii);
+        if (field_name.compare(candidate->name()) == 0)
+        {
+            return candidate;
+        }
+    }
+    return nullptr;
+}
+
 bool Arcus::PythonMessage::__hasattr__(const std::string& field_name) const
 {
-    auto field = _descriptor->FindFieldByName(field_name);
+    auto field = findFieldByNameHack(_descriptor, field_name);
     return bool(field);
 }
 
 PyObject* Arcus::PythonMessage::__getattr__(const std::string& field_name) const
 {
-    auto field = _descriptor->FindFieldByName(field_name);
+    auto field = findFieldByNameHack(_descriptor, field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -101,7 +115,7 @@ PyObject* Arcus::PythonMessage::__getattr__(const std::string& field_name) const
 
 void Arcus::PythonMessage::__setattr__(const std::string& field_name, PyObject* value)
 {
-    auto field = _descriptor->FindFieldByName(field_name);
+    auto field = findFieldByNameHack(_descriptor, field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -177,7 +191,7 @@ void Arcus::PythonMessage::__setattr__(const std::string& field_name, PyObject* 
 
 PythonMessage* Arcus::PythonMessage::addRepeatedMessage(const std::string& field_name)
 {
-    auto field = _descriptor->FindFieldByName(field_name);
+    auto field = findFieldByNameHack(_descriptor, field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -190,7 +204,7 @@ PythonMessage* Arcus::PythonMessage::addRepeatedMessage(const std::string& field
 
 int PythonMessage::repeatedMessageCount(const std::string& field_name) const
 {
-    auto field = _descriptor->FindFieldByName(field_name);
+    auto field = findFieldByNameHack(_descriptor, field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -202,7 +216,7 @@ int PythonMessage::repeatedMessageCount(const std::string& field_name) const
 
 PythonMessage* Arcus::PythonMessage::getMessage(const std::string& field_name)
 {
-    auto field = _descriptor->FindFieldByName(field_name);
+    auto field = findFieldByNameHack(_descriptor, field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -213,7 +227,7 @@ PythonMessage* Arcus::PythonMessage::getMessage(const std::string& field_name)
 
 PythonMessage* Arcus::PythonMessage::getRepeatedMessage(const std::string& field_name, int index)
 {
-    auto field = _descriptor->FindFieldByName(field_name);
+    auto field = findFieldByNameHack(_descriptor, field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
