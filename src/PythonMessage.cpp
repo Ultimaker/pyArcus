@@ -8,47 +8,39 @@
 #include <cstdint>
 
 #include <google/protobuf/message.h>
-#include <google/protobuf/reflection.h>
+// #include <google/protobuf/reflection.h>
 
-using namespace Arcus;
-using namespace google::protobuf;
+namespace gp = google::protobuf;
 
-PythonMessage::PythonMessage(google::protobuf::Message* message)
+namespace Arcus
 {
-    _message = message;
-    _reflection = message->GetReflection();
-    _descriptor = message->GetDescriptor();
-}
 
-Arcus::PythonMessage::PythonMessage(const MessagePtr& message)
-{
-    _shared_message = message;
-    _message = message.get();
-    _reflection = message->GetReflection();
-    _descriptor = message->GetDescriptor();
-}
-
-PythonMessage::~PythonMessage()
+PythonMessage::PythonMessage(gp::Message* message) : _message(message), _reflection(message->GetReflection()), _descriptor(message->GetDescriptor())
 {
 }
 
-std::string Arcus::PythonMessage::getTypeName() const
+PythonMessage::PythonMessage(const MessagePtr& message) : _shared_message(message), _message(message.get()), _reflection(message->GetReflection()), _descriptor(message->GetDescriptor())
+{
+}
+
+PythonMessage::~PythonMessage() = default;
+
+std::string PythonMessage::getTypeName() const
 {
     return std::string(_message->GetTypeName());
 }
 
-MessagePtr Arcus::PythonMessage::getSharedMessage() const
+MessagePtr PythonMessage::getSharedMessage() const
 {
     return _shared_message;
 }
 
-// Instead of `_descriptor->FindFieldByName(field_name)`.
-const google::protobuf::FieldDescriptor* findFieldByNameHack(const google::protobuf::Descriptor* _descriptor, const std::string_view field_name)
+const gp::FieldDescriptor* PythonMessage::findFieldByNameHack(const std::string& field_name) const
 {
     for (int ii = 0; ii < _descriptor->field_count(); ++ii)
     {
-        auto candidate = _descriptor->field(ii);
-        if (field_name.compare(candidate->name()) == 0)
+        const gp::FieldDescriptor* candidate = _descriptor->field(ii);
+        if (field_name == candidate->name())
         {
             return candidate;
         }
@@ -56,79 +48,65 @@ const google::protobuf::FieldDescriptor* findFieldByNameHack(const google::proto
     return nullptr;
 }
 
-bool Arcus::PythonMessage::__hasattr__(const std::string& field_name) const
+bool PythonMessage::__hasattr__(const std::string& field_name) const
 {
-    auto field = findFieldByNameHack(_descriptor, field_name);
+    const gp::FieldDescriptor* field = findFieldByNameHack(field_name);
     return bool(field);
 }
 
-// Read one scalar value from a field and return it as a Python object.
-// Pass index >= 0 for a repeated field element, or index < 0 for a singular field.
-static PyObject* getScalarField(const google::protobuf::Reflection* reflection,
-                                const google::protobuf::Message& message,
-                                const google::protobuf::FieldDescriptor* field,
-                                int index)
+PyObject* PythonMessage::getFieldValue(const gp::FieldDescriptor* field, const std::optional<int>& index) const
 {
-    const bool repeated = index >= 0;
+    const bool repeated = index.has_value();
     switch (field->type())
     {
-    case FieldDescriptor::TYPE_FLOAT:
-        return PyFloat_FromDouble(repeated ? reflection->GetRepeatedFloat(message, field, index)
-                                           : reflection->GetFloat(message, field));
-    case FieldDescriptor::TYPE_DOUBLE:
-        return PyFloat_FromDouble(repeated ? reflection->GetRepeatedDouble(message, field, index)
-                                           : reflection->GetDouble(message, field));
-    case FieldDescriptor::TYPE_INT32:
-    case FieldDescriptor::TYPE_FIXED32:
-    case FieldDescriptor::TYPE_SINT32:
-    case FieldDescriptor::TYPE_SFIXED32:
-        return PyLong_FromLong(repeated ? reflection->GetRepeatedInt32(message, field, index)
-                                        : reflection->GetInt32(message, field));
-    case FieldDescriptor::TYPE_INT64:
-    case FieldDescriptor::TYPE_FIXED64:
-    case FieldDescriptor::TYPE_SINT64:
-    case FieldDescriptor::TYPE_SFIXED64:
-        return PyLong_FromLongLong(repeated ? reflection->GetRepeatedInt64(message, field, index)
-                                            : reflection->GetInt64(message, field));
-    case FieldDescriptor::TYPE_UINT32:
-        return PyLong_FromUnsignedLong(repeated ? reflection->GetRepeatedUInt32(message, field, index)
-                                                : reflection->GetUInt32(message, field));
-    case FieldDescriptor::TYPE_UINT64:
-        return PyLong_FromUnsignedLongLong(repeated ? reflection->GetRepeatedUInt64(message, field, index)
-                                                    : reflection->GetUInt64(message, field));
-    case FieldDescriptor::TYPE_BOOL:
+    case gp::FieldDescriptor::TYPE_FLOAT:
+        return PyFloat_FromDouble(repeated ? _reflection->GetRepeatedFloat(*_message, field, *index) : _reflection->GetFloat(*_message, field));
+    case gp::FieldDescriptor::TYPE_DOUBLE:
+        return PyFloat_FromDouble(repeated ? _reflection->GetRepeatedDouble(*_message, field, *index) : _reflection->GetDouble(*_message, field));
+    case gp::FieldDescriptor::TYPE_INT32:
+    case gp::FieldDescriptor::TYPE_FIXED32:
+    case gp::FieldDescriptor::TYPE_SINT32:
+    case gp::FieldDescriptor::TYPE_SFIXED32:
+        return PyLong_FromLong(repeated ? _reflection->GetRepeatedInt32(*_message, field, *index) : _reflection->GetInt32(*_message, field));
+    case gp::FieldDescriptor::TYPE_INT64:
+    case gp::FieldDescriptor::TYPE_FIXED64:
+    case gp::FieldDescriptor::TYPE_SINT64:
+    case gp::FieldDescriptor::TYPE_SFIXED64:
+        return PyLong_FromLongLong(repeated ? _reflection->GetRepeatedInt64(*_message, field, *index) : _reflection->GetInt64(*_message, field));
+    case gp::FieldDescriptor::TYPE_UINT32:
+        return PyLong_FromUnsignedLong(repeated ? _reflection->GetRepeatedUInt32(*_message, field, *index) : _reflection->GetUInt32(*_message, field));
+    case gp::FieldDescriptor::TYPE_UINT64:
+        return PyLong_FromUnsignedLongLong(repeated ? _reflection->GetRepeatedUInt64(*_message, field, *index) : _reflection->GetUInt64(*_message, field));
+    case gp::FieldDescriptor::TYPE_BOOL:
     {
-        bool v = repeated ? reflection->GetRepeatedBool(message, field, index) : reflection->GetBool(message, field);
-        if (v)
+        const bool value_bool = repeated ? _reflection->GetRepeatedBool(*_message, field, *index) : _reflection->GetBool(*_message, field);
+        if (value_bool)
         {
             Py_RETURN_TRUE;
         }
         Py_RETURN_FALSE;
     }
-    case FieldDescriptor::TYPE_BYTES:
+    case gp::FieldDescriptor::TYPE_BYTES:
     {
-        std::string data = repeated ? reflection->GetRepeatedString(message, field, index)
-                                    : reflection->GetString(message, field);
+        const std::string data = repeated ? _reflection->GetRepeatedString(*_message, field, *index) : _reflection->GetString(*_message, field);
         return PyBytes_FromStringAndSize(data.c_str(), data.size());
     }
-    case FieldDescriptor::TYPE_STRING:
+    case gp::FieldDescriptor::TYPE_STRING:
     {
-        std::string data = repeated ? reflection->GetRepeatedString(message, field, index)
-                                    : reflection->GetString(message, field);
+        const std::string data = repeated ? _reflection->GetRepeatedString(*_message, field, *index) : _reflection->GetString(*_message, field);
         return PyUnicode_FromString(data.c_str());
     }
-    case FieldDescriptor::TYPE_ENUM:
-        return PyLong_FromLong(repeated ? reflection->GetRepeatedEnumValue(message, field, index)
-                                        : reflection->GetEnumValue(message, field));
+    case gp::FieldDescriptor::TYPE_ENUM:
+        return PyLong_FromLong(repeated ? _reflection->GetRepeatedEnumValue(*_message, field, *index) : _reflection->GetEnumValue(*_message, field));
     default:
         PyErr_SetString(PyExc_ValueError, "Could not handle value of field");
         return nullptr;
     }
 }
 
-PyObject* Arcus::PythonMessage::__getattr__(const std::string& field_name) const
+PyObject* PythonMessage::__getattr__(const std::string& field_name) const
 {
-    auto field = findFieldByNameHack(_descriptor, field_name);
+    const gp::FieldDescriptor* field = findFieldByNameHack(field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -137,7 +115,7 @@ PyObject* Arcus::PythonMessage::__getattr__(const std::string& field_name) const
 
     if (field->is_repeated())
     {
-        int count = _reflection->FieldSize(*_message, field);
+        const int count = _reflection->FieldSize(*_message, field);
         PyObject* list = PyList_New(count);
         if (! list)
         {
@@ -145,7 +123,7 @@ PyObject* Arcus::PythonMessage::__getattr__(const std::string& field_name) const
         }
         for (int i = 0; i < count; ++i)
         {
-            PyObject* item = getScalarField(_reflection, *_message, field, i);
+            PyObject* item = getFieldValue(field, i);
             if (! item)
             {
                 Py_DECREF(list);
@@ -156,153 +134,148 @@ PyObject* Arcus::PythonMessage::__getattr__(const std::string& field_name) const
         return list;
     }
 
-    return getScalarField(_reflection, *_message, field, -1);
+    return getFieldValue(field);
 }
 
-// Write one scalar Python value into a field.
-// Pass add = true to append to a repeated field, or add = false to set a singular field.
-static bool setScalarField(google::protobuf::Message* message,
-                           const google::protobuf::Reflection* reflection,
-                           const google::protobuf::FieldDescriptor* field,
-                           PyObject* value,
-                           bool add)
+bool PythonMessage::setFieldValue(const gp::FieldDescriptor* field, PyObject* value, bool append)
 {
     switch (field->type())
     {
-    case FieldDescriptor::TYPE_FLOAT:
+    case gp::FieldDescriptor::TYPE_FLOAT:
     {
-        double v = PyFloat_AsDouble(value);
-        if (v == -1.0 && PyErr_Occurred())
+        double value_double = PyFloat_AsDouble(value);
+        if (value_double == -1.0 && PyErr_Occurred())
         {
             return false;
         }
-        if (add)
+        if (append)
         {
-            reflection->AddFloat(message, field, static_cast<float>(v));
+            _reflection->AddFloat(_message, field, static_cast<float>(value_double));
         }
         else
         {
-            reflection->SetFloat(message, field, static_cast<float>(v));
+            _reflection->SetFloat(_message, field, static_cast<float>(value_double));
         }
         break;
     }
-    case FieldDescriptor::TYPE_DOUBLE:
+    case gp::FieldDescriptor::TYPE_DOUBLE:
     {
-        double v = PyFloat_AsDouble(value);
-        if (v == -1.0 && PyErr_Occurred())
+        double value_double = PyFloat_AsDouble(value);
+        if (value_double == -1.0 && PyErr_Occurred())
         {
             return false;
         }
-        add ? reflection->AddDouble(message, field, v) : reflection->SetDouble(message, field, v);
+        append ? _reflection->AddDouble(_message, field, value_double) : _reflection->SetDouble(_message, field, value_double);
         break;
     }
-    case FieldDescriptor::TYPE_INT32:
-    case FieldDescriptor::TYPE_FIXED32:
-    case FieldDescriptor::TYPE_SINT32:
-    case FieldDescriptor::TYPE_SFIXED32:
+    case gp::FieldDescriptor::TYPE_INT32:
+    case gp::FieldDescriptor::TYPE_FIXED32:
+    case gp::FieldDescriptor::TYPE_SINT32:
+    case gp::FieldDescriptor::TYPE_SFIXED32:
     {
-        long v = PyLong_AsLong(value);
-        if (v == -1 && PyErr_Occurred())
+        long value_long = PyLong_AsLong(value);
+        if (value_long == -1 && PyErr_Occurred())
         {
             return false;
         }
-        if (add)
+        if (append)
         {
-            reflection->AddInt32(message, field, static_cast<int32_t>(v));
+            _reflection->AddInt32(_message, field, static_cast<int32_t>(value_long));
         }
         else
         {
-            reflection->SetInt32(message, field, static_cast<int32_t>(v));
+            _reflection->SetInt32(_message, field, static_cast<int32_t>(value_long));
         }
         break;
     }
-    case FieldDescriptor::TYPE_INT64:
-    case FieldDescriptor::TYPE_FIXED64:
-    case FieldDescriptor::TYPE_SINT64:
-    case FieldDescriptor::TYPE_SFIXED64:
+    case gp::FieldDescriptor::TYPE_INT64:
+    case gp::FieldDescriptor::TYPE_FIXED64:
+    case gp::FieldDescriptor::TYPE_SINT64:
+    case gp::FieldDescriptor::TYPE_SFIXED64:
     {
-        long long v = PyLong_AsLongLong(value);
-        if (v == -1 && PyErr_Occurred())
+        long long value_ll = PyLong_AsLongLong(value);
+        if (value_ll == -1 && PyErr_Occurred())
         {
             return false;
         }
-        if (add)
+        if (append)
         {
-            reflection->AddInt64(message, field, static_cast<int64_t>(v));
+            _reflection->AddInt64(_message, field, static_cast<int64_t>(value_ll));
         }
         else
         {
-            reflection->SetInt64(message, field, static_cast<int64_t>(v));
+            _reflection->SetInt64(_message, field, static_cast<int64_t>(value_ll));
         }
         break;
     }
-    case FieldDescriptor::TYPE_UINT32:
+    case gp::FieldDescriptor::TYPE_UINT32:
     {
-        unsigned long v = PyLong_AsUnsignedLong(value);
-        if (v == static_cast<unsigned long>(-1) && PyErr_Occurred())
+        unsigned long value_ul = PyLong_AsUnsignedLong(value);
+        if (value_ul == static_cast<unsigned long>(-1) && PyErr_Occurred())
         {
             return false;
         }
-        if (add)
+        if (append)
         {
-            reflection->AddUInt32(message, field, static_cast<uint32_t>(v));
+            _reflection->AddUInt32(_message, field, static_cast<uint32_t>(value_ul));
         }
         else
         {
-            reflection->SetUInt32(message, field, static_cast<uint32_t>(v));
+            _reflection->SetUInt32(_message, field, static_cast<uint32_t>(value_ul));
         }
         break;
     }
-    case FieldDescriptor::TYPE_UINT64:
+    case gp::FieldDescriptor::TYPE_UINT64:
     {
-        unsigned long long v = PyLong_AsUnsignedLongLong(value);
-        if (v == static_cast<unsigned long long>(-1) && PyErr_Occurred())
+        unsigned long long value_ull = PyLong_AsUnsignedLongLong(value);
+        if (value_ull == static_cast<unsigned long long>(-1) && PyErr_Occurred())
         {
             return false;
         }
-        if (add)
+        if (append)
         {
-            reflection->AddUInt64(message, field, static_cast<uint64_t>(v));
+            _reflection->AddUInt64(_message, field, static_cast<uint64_t>(value_ull));
         }
         else
         {
-            reflection->SetUInt64(message, field, static_cast<uint64_t>(v));
+            _reflection->SetUInt64(_message, field, static_cast<uint64_t>(value_ull));
         }
         break;
     }
-    case FieldDescriptor::TYPE_BOOL:
+    case gp::FieldDescriptor::TYPE_BOOL:
     {
-        int v = PyObject_IsTrue(value);
-        if (v < 0)
+        int value_int = PyObject_IsTrue(value);
+        if (value_int < 0)
         {
             return false;
         }
-        add ? reflection->AddBool(message, field, v != 0) : reflection->SetBool(message, field, v != 0);
+        const bool value_bool = value_int != 0;
+        append ? _reflection->AddBool(_message, field, value_bool) : _reflection->SetBool(_message, field, value_bool);
         break;
     }
-    case FieldDescriptor::TYPE_BYTES:
+    case gp::FieldDescriptor::TYPE_BYTES:
     {
         Py_buffer buffer;
         if (PyObject_GetBuffer(value, &buffer, PyBUF_SIMPLE) < 0)
         {
             return false;
         }
-        std::string str(reinterpret_cast<char*>(buffer.buf), buffer.len);
+        std::string const str(reinterpret_cast<char*>(buffer.buf), buffer.len);
         PyBuffer_Release(&buffer);
-        add ? reflection->AddString(message, field, str) : reflection->SetString(message, field, str);
+        append ? _reflection->AddString(_message, field, str) : _reflection->SetString(_message, field, str);
         break;
     }
-    case FieldDescriptor::TYPE_STRING:
+    case gp::FieldDescriptor::TYPE_STRING:
     {
         const char* str = PyUnicode_AsUTF8(value);
         if (! str)
         {
             return false;
         }
-        add ? reflection->AddString(message, field, str) : reflection->SetString(message, field, str);
+        append ? _reflection->AddString(_message, field, str) : _reflection->SetString(_message, field, str);
         break;
     }
-    case FieldDescriptor::TYPE_ENUM:
+    case gp::FieldDescriptor::TYPE_ENUM:
     {
         if (PyUnicode_Check(value))
         {
@@ -317,22 +290,22 @@ static bool setScalarField(google::protobuf::Message* message,
                 PyErr_Format(PyExc_ValueError, "Unknown enum value: %s", name);
                 return false;
             }
-            add ? reflection->AddEnum(message, field, enum_value) : reflection->SetEnum(message, field, enum_value);
+            append ? _reflection->AddEnum(_message, field, enum_value) : _reflection->SetEnum(_message, field, enum_value);
         }
         else
         {
-            long v = PyLong_AsLong(value);
-            if (v == -1 && PyErr_Occurred())
+            long value_long = PyLong_AsLong(value);
+            if (value_long == -1 && PyErr_Occurred())
             {
                 return false;
             }
-            if (add)
+            if (append)
             {
-                reflection->AddEnumValue(message, field, static_cast<int>(v));
+                _reflection->AddEnumValue(_message, field, static_cast<int>(value_long));
             }
             else
             {
-                reflection->SetEnumValue(message, field, static_cast<int>(v));
+                _reflection->SetEnumValue(_message, field, static_cast<int>(value_long));
             }
         }
         break;
@@ -344,9 +317,9 @@ static bool setScalarField(google::protobuf::Message* message,
     return true;
 }
 
-void Arcus::PythonMessage::__setattr__(const std::string& field_name, PyObject* value)
+void PythonMessage::__setattr__(const std::string& field_name, PyObject* value)
 {
-    auto field = findFieldByNameHack(_descriptor, field_name);
+    auto field = findFieldByNameHack(field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -364,7 +337,7 @@ void Arcus::PythonMessage::__setattr__(const std::string& field_name, PyObject* 
         PyObject* item;
         while ((item = PyIter_Next(iter)) != nullptr)
         {
-            bool ok = setScalarField(_message, _reflection, field, item, true);
+            bool ok = setFieldValue(field, item, true);
             Py_DECREF(item);
             if (! ok)
             {
@@ -380,25 +353,25 @@ void Arcus::PythonMessage::__setattr__(const std::string& field_name, PyObject* 
         return;
     }
 
-    setScalarField(_message, _reflection, field, value, false);
+    setFieldValue(field, value, false);
 }
 
-PythonMessage* Arcus::PythonMessage::addRepeatedMessage(const std::string& field_name)
+PythonMessage* PythonMessage::addRepeatedMessage(const std::string& field_name)
 {
-    auto field = findFieldByNameHack(_descriptor, field_name);
+    auto field = findFieldByNameHack(field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
         return nullptr;
     }
 
-    Message* message = _reflection->AddMessage(_message, field);
+    gp::Message* message = _reflection->AddMessage(_message, field);
     return new PythonMessage(message);
 }
 
 int PythonMessage::repeatedMessageCount(const std::string& field_name) const
 {
-    auto field = findFieldByNameHack(_descriptor, field_name);
+    auto field = findFieldByNameHack(field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -408,9 +381,9 @@ int PythonMessage::repeatedMessageCount(const std::string& field_name) const
     return _reflection->FieldSize(*_message, field);
 }
 
-PythonMessage* Arcus::PythonMessage::getMessage(const std::string& field_name)
+PythonMessage* PythonMessage::getMessage(const std::string& field_name)
 {
-    auto field = findFieldByNameHack(_descriptor, field_name);
+    auto field = findFieldByNameHack(field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -419,9 +392,9 @@ PythonMessage* Arcus::PythonMessage::getMessage(const std::string& field_name)
     return new PythonMessage(_reflection->MutableMessage(_message, field));
 }
 
-PythonMessage* Arcus::PythonMessage::getRepeatedMessage(const std::string& field_name, int index)
+PythonMessage* PythonMessage::getRepeatedMessage(const std::string& field_name, int index)
 {
-    auto field = findFieldByNameHack(_descriptor, field_name);
+    auto field = findFieldByNameHack(field_name);
     if (! field)
     {
         PyErr_SetString(PyExc_AttributeError, field_name.c_str());
@@ -437,7 +410,7 @@ PythonMessage* Arcus::PythonMessage::getRepeatedMessage(const std::string& field
     return new PythonMessage(_reflection->MutableRepeatedMessage(_message, field, index));
 }
 
-int Arcus::PythonMessage::getEnumValue(const std::string& enum_value) const
+int PythonMessage::getEnumValue(const std::string& enum_value) const
 {
     auto field = _descriptor->FindEnumValueByName(enum_value);
     if (! field)
@@ -447,3 +420,5 @@ int Arcus::PythonMessage::getEnumValue(const std::string& enum_value) const
 
     return field->number();
 }
+
+} // namespace Arcus
