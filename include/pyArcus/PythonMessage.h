@@ -111,9 +111,8 @@ private:
      * @param field The field which value is to be set
      * @param value The value to be set, as a raw python object
      * @param append Whether the value should be appended to a repeatable field, or just set as a scalar value
-     * @return True if the value was correctly set, false otherwise
      */
-    bool setFieldValue(const google::protobuf::FieldDescriptor* field, PyObject* value, bool append);
+    void setFieldValue(const google::protobuf::FieldDescriptor* field, PyObject* value, bool append);
 
     /*!
      * @brief Replaces `_descriptor->FindFieldByName(field_name)` since it sometimes doesn't give an actual existing field

@@ -8,7 +8,6 @@
 #include <cstdint>
 
 #include <google/protobuf/message.h>
-// #include <google/protobuf/reflection.h>
 
 namespace gp = google::protobuf;
 
@@ -137,34 +136,19 @@ PyObject* PythonMessage::__getattr__(const std::string& field_name) const
     return getFieldValue(field);
 }
 
-bool PythonMessage::setFieldValue(const gp::FieldDescriptor* field, PyObject* value, bool append)
+void PythonMessage::setFieldValue(const gp::FieldDescriptor* field, PyObject* value, bool append)
 {
     switch (field->type())
     {
     case gp::FieldDescriptor::TYPE_FLOAT:
     {
-        double value_double = PyFloat_AsDouble(value);
-        if (value_double == -1.0 && PyErr_Occurred())
-        {
-            return false;
-        }
-        if (append)
-        {
-            _reflection->AddFloat(_message, field, static_cast<float>(value_double));
-        }
-        else
-        {
-            _reflection->SetFloat(_message, field, static_cast<float>(value_double));
-        }
+        const double value_double = PyFloat_AsDouble(value);
+        append ? _reflection->AddFloat(_message, field, static_cast<float>(value_double)) : _reflection->SetFloat(_message, field, static_cast<float>(value_double));
         break;
     }
     case gp::FieldDescriptor::TYPE_DOUBLE:
     {
-        double value_double = PyFloat_AsDouble(value);
-        if (value_double == -1.0 && PyErr_Occurred())
-        {
-            return false;
-        }
+        const double value_double = PyFloat_AsDouble(value);
         append ? _reflection->AddDouble(_message, field, value_double) : _reflection->SetDouble(_message, field, value_double);
         break;
     }
@@ -173,19 +157,8 @@ bool PythonMessage::setFieldValue(const gp::FieldDescriptor* field, PyObject* va
     case gp::FieldDescriptor::TYPE_SINT32:
     case gp::FieldDescriptor::TYPE_SFIXED32:
     {
-        long value_long = PyLong_AsLong(value);
-        if (value_long == -1 && PyErr_Occurred())
-        {
-            return false;
-        }
-        if (append)
-        {
-            _reflection->AddInt32(_message, field, static_cast<int32_t>(value_long));
-        }
-        else
-        {
-            _reflection->SetInt32(_message, field, static_cast<int32_t>(value_long));
-        }
+        const long value_long = PyLong_AsLong(value);
+        append ? _reflection->AddInt32(_message, field, static_cast<int32_t>(value_long)) : _reflection->SetInt32(_message, field, static_cast<int32_t>(value_long));
         break;
     }
     case gp::FieldDescriptor::TYPE_INT64:
@@ -193,85 +166,40 @@ bool PythonMessage::setFieldValue(const gp::FieldDescriptor* field, PyObject* va
     case gp::FieldDescriptor::TYPE_SINT64:
     case gp::FieldDescriptor::TYPE_SFIXED64:
     {
-        long long value_ll = PyLong_AsLongLong(value);
-        if (value_ll == -1 && PyErr_Occurred())
-        {
-            return false;
-        }
-        if (append)
-        {
-            _reflection->AddInt64(_message, field, static_cast<int64_t>(value_ll));
-        }
-        else
-        {
-            _reflection->SetInt64(_message, field, static_cast<int64_t>(value_ll));
-        }
+        const long long value_ll = PyLong_AsLongLong(value);
+        append ? _reflection->AddInt64(_message, field, static_cast<int64_t>(value_ll)) : _reflection->SetInt64(_message, field, static_cast<int64_t>(value_ll));
         break;
     }
     case gp::FieldDescriptor::TYPE_UINT32:
     {
-        unsigned long value_ul = PyLong_AsUnsignedLong(value);
-        if (value_ul == static_cast<unsigned long>(-1) && PyErr_Occurred())
-        {
-            return false;
-        }
-        if (append)
-        {
-            _reflection->AddUInt32(_message, field, static_cast<uint32_t>(value_ul));
-        }
-        else
-        {
-            _reflection->SetUInt32(_message, field, static_cast<uint32_t>(value_ul));
-        }
+        const unsigned long value_ul = PyLong_AsUnsignedLong(value);
+        append ? _reflection->AddUInt32(_message, field, static_cast<uint32_t>(value_ul)) : _reflection->SetUInt32(_message, field, static_cast<uint32_t>(value_ul));
         break;
     }
     case gp::FieldDescriptor::TYPE_UINT64:
     {
-        unsigned long long value_ull = PyLong_AsUnsignedLongLong(value);
-        if (value_ull == static_cast<unsigned long long>(-1) && PyErr_Occurred())
-        {
-            return false;
-        }
-        if (append)
-        {
-            _reflection->AddUInt64(_message, field, static_cast<uint64_t>(value_ull));
-        }
-        else
-        {
-            _reflection->SetUInt64(_message, field, static_cast<uint64_t>(value_ull));
-        }
+        const unsigned long long value_ull = PyLong_AsUnsignedLongLong(value);
+        append ? _reflection->AddUInt64(_message, field, static_cast<uint64_t>(value_ull)) : _reflection->SetUInt64(_message, field, static_cast<uint64_t>(value_ull));
         break;
     }
     case gp::FieldDescriptor::TYPE_BOOL:
     {
-        int value_int = PyObject_IsTrue(value);
-        if (value_int < 0)
-        {
-            return false;
-        }
-        const bool value_bool = value_int != 0;
+        const bool value_bool = value == Py_True;
         append ? _reflection->AddBool(_message, field, value_bool) : _reflection->SetBool(_message, field, value_bool);
         break;
     }
     case gp::FieldDescriptor::TYPE_BYTES:
     {
         Py_buffer buffer;
-        if (PyObject_GetBuffer(value, &buffer, PyBUF_SIMPLE) < 0)
-        {
-            return false;
-        }
+        PyObject_GetBuffer(value, &buffer, PyBUF_SIMPLE);
+
         std::string const str(reinterpret_cast<char*>(buffer.buf), buffer.len);
-        PyBuffer_Release(&buffer);
         append ? _reflection->AddString(_message, field, str) : _reflection->SetString(_message, field, str);
         break;
     }
     case gp::FieldDescriptor::TYPE_STRING:
     {
         const char* str = PyUnicode_AsUTF8(value);
-        if (! str)
-        {
-            return false;
-        }
         append ? _reflection->AddString(_message, field, str) : _reflection->SetString(_message, field, str);
         break;
     }
@@ -279,42 +207,20 @@ bool PythonMessage::setFieldValue(const gp::FieldDescriptor* field, PyObject* va
     {
         if (PyUnicode_Check(value))
         {
-            const char* name = PyUnicode_AsUTF8(value);
-            if (! name)
-            {
-                return false;
-            }
-            auto enum_value = field->enum_type()->FindValueByName(name);
-            if (! enum_value)
-            {
-                PyErr_Format(PyExc_ValueError, "Unknown enum value: %s", name);
-                return false;
-            }
+            const auto enum_value = _descriptor->FindEnumValueByName(PyUnicode_AsUTF8(value));
             append ? _reflection->AddEnum(_message, field, enum_value) : _reflection->SetEnum(_message, field, enum_value);
         }
         else
         {
-            long value_long = PyLong_AsLong(value);
-            if (value_long == -1 && PyErr_Occurred())
-            {
-                return false;
-            }
-            if (append)
-            {
-                _reflection->AddEnumValue(_message, field, static_cast<int>(value_long));
-            }
-            else
-            {
-                _reflection->SetEnumValue(_message, field, static_cast<int>(value_long));
-            }
+            const int value_int = static_cast<int>(PyLong_AsLong(value));
+            append ? _reflection->AddEnumValue(_message, field, value_int) : _reflection->SetEnumValue(_message, field, value_int);
         }
         break;
     }
     default:
         PyErr_SetString(PyExc_ValueError, "Could not handle value of field");
-        return false;
+        break;
     }
-    return true;
 }
 
 void PythonMessage::__setattr__(const std::string& field_name, PyObject* value)
@@ -337,13 +243,8 @@ void PythonMessage::__setattr__(const std::string& field_name, PyObject* value)
         PyObject* item;
         while ((item = PyIter_Next(iter)) != nullptr)
         {
-            bool ok = setFieldValue(field, item, true);
+            setFieldValue(field, item, true);
             Py_DECREF(item);
-            if (! ok)
-            {
-                Py_DECREF(iter);
-                return;
-            }
         }
         Py_DECREF(iter);
         if (PyErr_Occurred())
