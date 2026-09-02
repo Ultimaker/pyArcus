@@ -247,10 +247,6 @@ void PythonMessage::__setattr__(const std::string& field_name, PyObject* value)
             Py_DECREF(item);
         }
         Py_DECREF(iter);
-        if (PyErr_Occurred())
-        {
-            return;
-        }
         return;
     }
 
