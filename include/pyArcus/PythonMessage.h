@@ -6,6 +6,7 @@
 
 #include "Arcus/Types.h"
 #include <Python.h>
+#include <optional>
 
 namespace google
 {
@@ -13,6 +14,7 @@ namespace protobuf
 {
 class Descriptor;
 class Reflection;
+class FieldDescriptor;
 } // namespace protobuf
 } // namespace google
 
@@ -60,7 +62,7 @@ public:
     /**
      * Get the number of messages in a repeated message field.
      */
-    int repeatedMessageCount(const std::string& field_name) const;
+    [[nodiscard]] int repeatedMessageCount(const std::string& field_name) const;
 
     /**
      * Get a specific instance of a message in a repeated message field.
@@ -88,12 +90,36 @@ public:
      *
      * \return The integer value of the specified enum.
      */
-    int getEnumValue(const std::string& enum_value) const;
+    [[nodiscard]] int getEnumValue(const std::string& enum_value) const;
 
     /**
      * Internal.
      */
-    MessagePtr getSharedMessage() const;
+    [[nodiscard]] MessagePtr getSharedMessage() const;
+
+private:
+    /*!
+     * Get the python object corresponding to the value of the given field
+     * @param field The field which value is to be retrieved
+     * @param index The index of the element if the field is repeatable, otherwise nullopt
+     * @return The corresponding python object, or nullptr if an error occured
+     */
+    PyObject* getFieldValue(const google::protobuf::FieldDescriptor* field, const std::optional<int>& index = std::nullopt) const;
+
+    /*!
+     * Sets the value of the field given the corresponding python object
+     * @param field The field which value is to be set
+     * @param value The value to be set, as a raw python object
+     * @param append Whether the value should be appended to a repeatable field, or just set as a scalar value
+     */
+    void setFieldValue(const google::protobuf::FieldDescriptor* field, PyObject* value, bool append);
+
+    /*!
+     * @brief Replaces `_descriptor->FindFieldByName(field_name)` since it sometimes doesn't give an actual existing field
+     * @param field_name The name of the fields to be used
+     * @return The matching field descriptor, or nullptr if it was not found
+     */
+    [[nodiscard]] const google::protobuf::FieldDescriptor* findFieldByNameHack(const std::string& field_name) const;
 
 private:
     MessagePtr _shared_message;
